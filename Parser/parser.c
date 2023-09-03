@@ -45,6 +45,7 @@ static KeywordToken *reserved_keywords[] = {
     },
     (KeywordToken[]) {
         {"raise", 526},
+        {"zouni", 505},
         {"yield", 581},
         {"break", 509},
         {"async", 669},
@@ -64,7 +65,6 @@ static KeywordToken *reserved_keywords[] = {
         {NULL, -1},
     },
     (KeywordToken[]) {
-        {"proceed", 505},
         {"finally", 648},
         {NULL, -1},
     },
@@ -1709,7 +1709,7 @@ simple_stmts_rule(Parser *p)
 //     | &('import' | 'from') import_stmt
 //     | &'raise' raise_stmt
 //     | 'pass'
-//     | 'proceed'
+//     | 'zouni'
 //     | &'del' del_stmt
 //     | &'yield' yield_stmt
 //     | &'assert' assert_stmt
@@ -1912,18 +1912,18 @@ simple_stmt_rule(Parser *p)
         D(fprintf(stderr, "%*c%s simple_stmt[%d-%d]: %s failed!\n", p->level, ' ',
                   p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'pass'"));
     }
-    { // 'proceed'
+    { // 'zouni'
         if (p->error_indicator) {
             p->level--;
             return NULL;
         }
-        D(fprintf(stderr, "%*c> simple_stmt[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "'proceed'"));
+        D(fprintf(stderr, "%*c> simple_stmt[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "'zouni'"));
         Token * _keyword;
         if (
-            (_keyword = _PyPegen_expect_token(p, 505))  // token='proceed'
+            (_keyword = _PyPegen_expect_token(p, 505))  // token='zouni'
         )
         {
-            D(fprintf(stderr, "%*c+ simple_stmt[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "'proceed'"));
+            D(fprintf(stderr, "%*c+ simple_stmt[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "'zouni'"));
             Token *_token = _PyPegen_get_last_nonnwhitespace_token(p);
             if (_token == NULL) {
                 p->level--;
@@ -1943,7 +1943,7 @@ simple_stmt_rule(Parser *p)
         }
         p->mark = _mark;
         D(fprintf(stderr, "%*c%s simple_stmt[%d-%d]: %s failed!\n", p->level, ' ',
-                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'proceed'"));
+                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "'zouni'"));
     }
     { // &'del' del_stmt
         if (p->error_indicator) {

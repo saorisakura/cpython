@@ -45,13 +45,13 @@ kwlist = [
     'not',
     'or',
     'pass',
-    'proceed',
     'raise',
     'return',
     'try',
     'while',
     'with',
-    'yield'
+    'yield',
+    'zouni'
 ]
 
 softkwlist = [

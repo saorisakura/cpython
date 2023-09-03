@@ -118,7 +118,7 @@ simple_stmt[stmt_ty] (memo):
     | &('import' | 'from') import_stmt
     | &'raise' raise_stmt
     | 'pass' { _PyAST_Pass(EXTRA) }
-    | 'proceed' { _PyAST_Pass(EXTRA) }
+    | 'zouni' { _PyAST_Pass(EXTRA) }
     | &'del' del_stmt
     | &'yield' yield_stmt
     | &'assert' assert_stmt
