@@ -21,9 +21,6 @@ class Parser:
         while token.kind != EOF and token.value != '}':
             statements.append(self.parse_statement())
             token = self.lexer.peek()
-        # skip '}'
-        if self.lexer.peek().value == '}':
-            self.lexer.next()
         return statements
 
     def parse_statement(self) -> Statement:
@@ -46,6 +43,9 @@ class Parser:
             return self.parse_continue()
         elif token.kind == KeyWord and token.value == 'return':
             return self.parse_return()
+        elif token.kind == Separator and token.value == '{':
+            self.lexer.next()
+            return BlockStatement(self.parse_statements())
         else:
             return self.parse_expr_stmt()
 
@@ -88,22 +88,39 @@ class Parser:
             # skip '{'
             self.lexer.next()
             body = self.parse_statements()
+            # skip '}'
+            if self.lexer.peek().value == '}':
+                self.lexer.next()
+            else:
+                raise Exception('Expect }')
         else:
             # TODO: parse expression?????
             body = None
         return FunctionDeclaration(name, params, body)
 
     def parse_if(self):
+        # skip 'if'
         self.lexer.next()
+        # skip '('
         self.lexer.next()
         condition = self.parse_expr()
         self.lexer.next()
         then_block = self.parse_statements()
+        # skip '}'
+        if self.lexer.peek().value == '}':
+            self.lexer.next()
+        else:
+            raise Exception('Expect }')
         else_block = None
         token = self.lexer.peek()
         if token.kind == KeyWord and token.value == 'else':
             self.lexer.next()
             else_block = self.parse_statements()
+            # skip '}'
+            if self.lexer.peek().value == '}':
+                self.lexer.next()
+            else:
+                raise Exception('Expect }')
         return IfStatement(condition, then_block, else_block)
 
     def parse_while(self):
@@ -112,6 +129,11 @@ class Parser:
         condition = self.parse_expr()
         self.lexer.next()
         body = self.parse_statements()
+        # skip '}'
+        if self.lexer.peek().value == '}':
+            self.lexer.next()
+        else:
+            raise Exception('Expect }')
         return WhileStatement(condition, body)
 
     def parse_for(self):
@@ -123,6 +145,11 @@ class Parser:
         update = self.parse_expr()
         self.lexer.next()
         body = self.parse_statements()
+        # skip '}'
+        if self.lexer.peek().value == '}':
+            self.lexer.next()
+        else:
+            raise Exception('Expect }')
         return ForStatement(init, condition, update, body)
 
     def parse_break(self):
@@ -293,6 +320,21 @@ class Parser:
         token = self.lexer.peek()
         if token.kind == Identifier:
             self.lexer.next()
+            # function call
+            if self.lexer.peek().value == '(':
+                function_name = token.value
+                self.lexer.next()
+                args = []
+                token = self.lexer.peek()
+                while token.kind != Separator or token.value != ')':
+                    if token.kind == Separator and token.value == ',':
+                        self.lexer.next()
+                        token = self.lexer.peek()
+                    args.append(self.parse_expr())
+                    token = self.lexer.peek()
+                # skip ')'
+                self.lexer.next()
+                return CallExpression(function_name, None, args)
             return Variable(token.value, None)
         elif token.kind == IntegerLiteral:
             self.lexer.next()
@@ -385,7 +427,25 @@ function bxor(a, b) {
 }
 function bnot(a) {
     return ~a;
-}'''
+}
+let ret = add(1, 2);
+print(ret);
+if (ret == 3) {
+    print('add ok');
+} else {
+    print('add failed');
+}
+let ret1 = sub(1, 2);
+while (ret1 > 0) {
+    print(ret1);
+    ret1 = sub(ret1, 1);
+}
+let ret2 = mul(2, 3);
+let i;
+for (i = 0; i < ret2; i = add(i, 1)) {
+    print(i);
+}
+'''
 # TODO: 三元操作符识别
 # function cond(a, b, c) {
     # return a ? b : c;
@@ -395,7 +455,7 @@ function bnot(a) {
     parser = Parser(lexer)
     program = parser.parse()
     program.dump()
-    printer = AstPrinter()
+    # printer = AstPrinter()
     # program.accept(printer)
 
 

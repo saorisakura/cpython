@@ -93,7 +93,7 @@ class VariableDeclaration(Declaration):
 
     def dump(self, indent=0):
         print('  ' * indent + 'VariableDeclaration: ' + self.name)
-        self.initializer.dump(indent + 1)
+        self.initializer.dump(indent + 1) if self.initializer else None
 
 
 class Program(BlockStatement):
@@ -110,7 +110,7 @@ class Program(BlockStatement):
 
 
 class IfStatement(Statement):
-    def __init__(self, test: Expression, consequent: BlockStatement, alternate: BlockStatement):
+    def __init__(self, test: Expression, consequent: list, alternate: list):
         self.test = test
         self.consequent = consequent
         self.alternate = alternate
@@ -121,12 +121,14 @@ class IfStatement(Statement):
     def dump(self, indent=0):
         print('  ' * indent + 'IfStatement')
         self.test.dump(indent + 1)
-        self.consequent.dump(indent + 1)
-        self.alternate.dump(indent + 1)
+        for statement in self.consequent:
+            statement.dump(indent + 1)
+        for statement in self.alternate:
+            statement.dump(indent + 1)
 
 
 class WhileStatement(Statement):
-    def __init__(self, test: Expression, body: BlockStatement):
+    def __init__(self, test: Expression, body: list):
         self.test = test
         self.body = body
 
@@ -136,11 +138,12 @@ class WhileStatement(Statement):
     def dump(self, indent=0):
         print('  ' * indent + 'WhileStatement')
         self.test.dump(indent + 1)
-        self.body.dump(indent + 1)
+        for statement in self.body:
+            statement.dump(indent + 1)
 
 
 class ForStatement(Statement):
-    def __init__(self, init: AST, test: Expression, update: AST, body: BlockStatement):
+    def __init__(self, init: AST, test: Expression, update: AST, body: list):
         self.init = init
         self.test = test
         self.update = update
@@ -154,7 +157,8 @@ class ForStatement(Statement):
         self.init.dump(indent + 1)
         self.test.dump(indent + 1)
         self.update.dump(indent + 1)
-        self.body.dump(indent + 1)
+        for statement in self.body:
+            statement.dump(indent + 1)
 
 
 class BreakStatement(Statement):
