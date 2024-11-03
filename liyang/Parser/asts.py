@@ -63,7 +63,11 @@ class ExpressionStatement(Statement):
 
     def dump(self, indent=0):
         print('  ' * indent + 'ExpressionStatement')
-        self.expression.dump(indent + 1)
+        if isinstance(self.expression, list):
+            for expression in self.expression:
+                expression.dump(indent + 1)
+        else:
+            self.expression.dump(indent + 1)
 
 
 class FunctionDeclaration(Declaration):
@@ -93,7 +97,7 @@ class VariableDeclaration(Declaration):
 
     def dump(self, indent=0):
         print('  ' * indent + 'VariableDeclaration: ' + self.name)
-        self.initializer.dump(indent + 1) if self.initializer else None
+        self.initializer.dump(indent + 1) if self.initializer else print('  ' * (indent + 1) + 'Initializer: None')
 
 
 class Program(BlockStatement):
@@ -106,7 +110,11 @@ class Program(BlockStatement):
     def dump(self, indent=0):
         print('  ' * indent + 'Program')
         for statement in self.statements:
-            statement.dump(indent + 1)
+            if isinstance(statement, list):
+                for s in statement:
+                    s.dump(indent + 1)
+            else:
+                statement.dump(indent + 1)
 
 
 class IfStatement(Statement):

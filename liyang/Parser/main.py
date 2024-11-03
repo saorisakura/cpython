@@ -18,7 +18,7 @@ class Parser:
     def parse_statements(self):
         statements = []
         token = self.lexer.peek()
-        while token.kind != EOF and token.value != '}':
+        while token.kind != EOF:
             statements.append(self.parse_statement())
             token = self.lexer.peek()
         return statements
@@ -44,8 +44,7 @@ class Parser:
         elif token.kind == KeyWord and token.value == 'return':
             return self.parse_return()
         elif token.kind == Separator and token.value == '{':
-            self.lexer.next()
-            return BlockStatement(self.parse_statements())
+            return self.parse_block()
         else:
             return self.parse_expr_stmt()
 
@@ -82,20 +81,14 @@ class Parser:
             params.append(self.lexer.next().value)
             token = self.lexer.peek()
         # skip ')'
-        self.lexer.next()
-        token = self.lexer.peek()
-        if token.kind == Separator and token.value == '{':
-            # skip '{'
+        if self.lexer.peek().value == ')':
             self.lexer.next()
-            body = self.parse_statements()
-            # skip '}'
-            if self.lexer.peek().value == '}':
-                self.lexer.next()
-            else:
-                raise Exception('Expect }')
         else:
-            # TODO: parse expression?????
-            body = None
+            raise Exception('Expect )')
+        token = self.lexer.peek()
+        if token.kind != Separator or token.value != '{':
+            raise Exception('Expect {')
+        body = self.parse_block()
         return FunctionDeclaration(name, params, body)
 
     def parse_if(self):
@@ -105,22 +98,12 @@ class Parser:
         self.lexer.next()
         condition = self.parse_expr()
         self.lexer.next()
-        then_block = self.parse_statements()
-        # skip '}'
-        if self.lexer.peek().value == '}':
-            self.lexer.next()
-        else:
-            raise Exception('Expect }')
+        then_block = self.parse_block()
         else_block = None
         token = self.lexer.peek()
         if token.kind == KeyWord and token.value == 'else':
             self.lexer.next()
-            else_block = self.parse_statements()
-            # skip '}'
-            if self.lexer.peek().value == '}':
-                self.lexer.next()
-            else:
-                raise Exception('Expect }')
+            else_block = self.parse_block()
         return IfStatement(condition, then_block, else_block)
 
     def parse_while(self):
@@ -128,12 +111,7 @@ class Parser:
         self.lexer.next()
         condition = self.parse_expr()
         self.lexer.next()
-        body = self.parse_statements()
-        # skip '}'
-        if self.lexer.peek().value == '}':
-            self.lexer.next()
-        else:
-            raise Exception('Expect }')
+        body = self.parse_block()
         return WhileStatement(condition, body)
 
     def parse_for(self):
@@ -144,12 +122,7 @@ class Parser:
         self.lexer.next()
         update = self.parse_expr()
         self.lexer.next()
-        body = self.parse_statements()
-        # skip '}'
-        if self.lexer.peek().value == '}':
-            self.lexer.next()
-        else:
-            raise Exception('Expect }')
+        body = self.parse_block()
         return ForStatement(init, condition, update, body)
 
     def parse_break(self):
@@ -172,6 +145,22 @@ class Parser:
         expr = self.parse_expr()
         self.lexer.next()
         return ExpressionStatement(expr)
+
+    def parse_block(self):
+        if self.lexer.peek().value == '{':
+            self.lexer.next()
+        else:
+            raise Exception('Expect {')
+        stmt = []
+        token = self.lexer.peek()
+        while token.kind != Separator or token.value != '}':
+            stmt.append(self.parse_statement())
+            token = self.lexer.peek()
+        if self.lexer.peek().value == '}':
+            self.lexer.next()
+        else:
+            raise Exception('Expect }')
+        return stmt
 
     def parse_expr(self):
         # 递归下降解析表达式
@@ -348,17 +337,15 @@ class Parser:
         elif token.kind == BooleanLiteral:
             self.lexer.next()
             return Boolean(token.value)
-        elif token.kind == Operator and token.value == '(':
+        elif token.kind == Separator and token.value == '(':
             self.lexer.next()
             expr = self.parse_expr()
             self.lexer.next()
             return expr
-        elif token.kind == Operator and token.value == '{':
-            self.lexer.next()
-            expr = self.parse_object()
-            self.lexer.next()
+        elif token.kind == Separator and token.value == '{':
+            expr = self.parse_block()
             return expr
-        elif token.kind == Operator and token.value == '[':
+        elif token.kind == Separator and token.value == '[':
             self.lexer.next()
             expr = self.parse_array()
             self.lexer.next()
@@ -377,6 +364,28 @@ class AstPrinter(AstVisitor):
 
 def main():
     source = '''
+{
+    let a = 1;
+    print(a);
+}
+print('hello, world');
+let ret = add(1, 2);
+print(ret);
+if (ret == 3) {
+    print('add ok');
+} else {
+    print('add failed');
+}
+let ret1 = sub(1, 2);
+while (ret1 > 0) {
+    print(ret1);
+    ret1 = sub(ret1, 1);
+}
+let ret2 = mul(2, 3);
+let i;
+for (i = 0; i < ret2; i = add(i, 1)) {
+    print(i);
+}
 function add(a, b) {
     return a + b;
 }
@@ -427,23 +436,6 @@ function bxor(a, b) {
 }
 function bnot(a) {
     return ~a;
-}
-let ret = add(1, 2);
-print(ret);
-if (ret == 3) {
-    print('add ok');
-} else {
-    print('add failed');
-}
-let ret1 = sub(1, 2);
-while (ret1 > 0) {
-    print(ret1);
-    ret1 = sub(ret1, 1);
-}
-let ret2 = mul(2, 3);
-let i;
-for (i = 0; i < ret2; i = add(i, 1)) {
-    print(i);
 }
 '''
 # TODO: 三元操作符识别
