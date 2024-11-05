@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# 词法分析器
-# 词法分析器的作用是将源代码转换为单词流，即Token序列
-from Parser.scanner import *
-from Parser.asts import *
+from VM.scanner import *
+from VM.asts import *
+from VM.symbol_t import Symbol
+from VM.type import FunctionType, SystemType, Type
 
 
 # 语法分析为LL算法，因此需要知道如何使用First和Follow集合
@@ -11,9 +11,33 @@ from Parser.asts import *
 class Parser:
     def __init__(self, lexer: Lexer):
         self.lexer = lexer
+        self.errors = []
+        self.warnings = []
+
+    def add_error(self, error: str):
+        self.errors.append(error)
+
+    def add_warning(self, warning: str):
+        self.warnings.append(warning)
+
+    def parse_type(self, type_name: str) -> Type:
+        if type_name == 'int':
+            return SystemType.int_type
+        elif type_name == 'string':
+            return SystemType.string_type
+        elif type_name == 'decimal':
+            return SystemType.decimal_type
+        elif type_name == 'bool':
+            return SystemType.bool_type
+        elif type_name == 'any':
+            return SystemType.any_type
+        else:
+            raise Exception(f'Unknown type {type_name}')
 
     def parse(self):
-        return Program(self.parse_statements())
+        scope = Scope()
+        symbol = Symbol('program', FunctionType('program', ['any'], None))
+        return Program(self.parse_statements(), scope, symbol)
 
     def parse_statements(self):
         statements = []
@@ -56,17 +80,30 @@ class Parser:
             expr = self.parse_expr()
             self.lexer.next()
             return VariableDeclaration(name, expr)
-        return VariableDeclaration(name, None)
+        return VariableDeclaration(name)
 
     def parse_let_decl(self):
         self.lexer.next()
-        name = self.lexer.next().value
         token = self.lexer.next()
+        if token.kind != Identifier:
+            raise Exception(f'Expect identifier {self.lexer.get_position()}')
+        name = token.value
+        token = self.lexer.next()
+        typ = None
+
+        # 类型注解
+        if token.kind == Operator and token.value == ':':
+            typ = self.lexer.next()
+            if typ.kind != KeyWord:
+                raise Exception(f'Expect type {self.lexer.get_position()}')
+            token = self.lexer.next()
+
+        # 初始化
         if token.kind == Operator and token.value == '=':
             expr = self.parse_expr()
             self.lexer.next()
-            return VariableDeclaration(name, expr)
-        return VariableDeclaration(name, None)
+            return VariableDeclaration(name, expr, inferredType=typ)
+        return VariableDeclaration(name, inferredType=typ)
 
     def parse_func_decl(self):
         self.lexer.next()
@@ -89,7 +126,9 @@ class Parser:
         if token.kind != Separator or token.value != '{':
             raise Exception('Expect {')
         body = self.parse_block()
-        return FunctionDeclaration(name, params, body)
+        scope = Scope()
+        symbol = Symbol(name, FunctionType(name, params, body))
+        return FunctionDeclaration(name, params, body, scope, symbol)
 
     def parse_if(self):
         # skip 'if'
@@ -123,7 +162,8 @@ class Parser:
         update = self.parse_expr()
         self.lexer.next()
         body = self.parse_block()
-        return ForStatement(init, condition, update, body)
+        scope = Scope()
+        return ForStatement(init, condition, update, body, scope)
 
     def parse_break(self):
         self.lexer.next()
@@ -161,6 +201,17 @@ class Parser:
         else:
             raise Exception('Expect }')
         return BlockStatement(stmt)
+
+    def parse_array(self):
+        elements = []
+        token = self.lexer.peek()
+        while token.kind != Separator or token.value != ']':
+            if token.kind == Separator and token.value == ',':
+                self.lexer.next()
+                token = self.lexer.peek()
+            elements.append(self.parse_expr())
+            token = self.lexer.peek()
+        return ArrayStatement(elements)
 
     def parse_expr(self):
         # 递归下降解析表达式
@@ -324,7 +375,7 @@ class Parser:
                 # skip ')'
                 self.lexer.next()
                 return CallExpression(function_name, None, args)
-            return Variable(token.value, None)
+            return Variable(token.value)
         elif token.kind == IntegerLiteral:
             self.lexer.next()
             return Integer(token.value)
@@ -356,100 +407,3 @@ class Parser:
             return expr
         else:
             raise Exception('Unexpected token: ' + token.value)
-
-
-class AstPrinter(AstVisitor):
-    pass
-
-
-def main():
-    source = '''
-{
-    let a = 1;
-    print(a);
-}
-print('hello, world');
-let ret = add(1, 2);
-print(ret);
-if (ret == 3) {
-    print('add ok');
-} else {
-    print('add failed');
-}
-let ret1 = sub(1, 2);
-while (ret1 > 0) {
-    print(ret1);
-    ret1 = sub(ret1, 1);
-}
-let ret2 = mul(2, 3);
-let i;
-for (i = 0; i < ret2; i = add(i, 1)) {
-    print(i);
-}
-function add(a, b) {
-    return a + b;
-}
-function sub(a, b) {
-    return a - b;
-}
-function mul(a, b) {
-    return a * b;
-}
-function div(a, b) {
-    return a / b;
-}
-function mod(a, b) {
-    return a % b;
-}
-function eq(a, b) {
-    return a == b;
-}
-function ne(a, b) {
-    return a != b;
-}
-function lt(a, b) {
-    return a < b;
-}
-function gt(a, b) {
-    return a > b;
-}
-function le(a, b) {
-    return a <= b;
-}
-function ge(a, b) {
-    return a >= b;
-}
-function and(a, b) {
-    return a && b;
-}
-function or(a, b) {
-    return a || b;
-}
-function band(a, b) {
-    return a & b;
-}
-function bor(a, b) {
-    return a | b;
-}
-function bxor(a, b) {
-    return a ^ b;
-}
-function bnot(a) {
-    return ~a;
-}
-'''
-# TODO: 三元操作符识别
-# function cond(a, b, c) {
-    # return a ? b : c;
-# }
-
-    lexer = Lexer(CharStream(source))
-    parser = Parser(lexer)
-    program = parser.parse()
-    program.dump()
-    # printer = AstPrinter()
-    # program.accept(printer)
-
-
-if __name__ == '__main__':
-    main()

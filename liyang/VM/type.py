@@ -3,12 +3,14 @@
 # TODO: 循环引用检查如何实现，可以参考Python的类型系统
 # 类型系统
 from typing import List
-from Parser._typ import Type, ObjectType
+from VM._typ import Type, ObjectType, Union, Any
 
 
 class SystemType(Type):
     # 系统类型
     object_type = ObjectType("Object")
+
+    any_type = ObjectType("Any", [object_type])
 
     string_type = ObjectType("String", [object_type])
     int_type = ObjectType("Int", [object_type])
@@ -23,12 +25,12 @@ class SystemType(Type):
 
 
 class PrimitiveType(ObjectType):
-    def __init__(self, name: str|any, index: int = 0):
+    def __init__(self, name: Union[str, Any], index: int = 0):
         super().__init__(name, [SystemType.object_type], index)
 
 
 class StructType(Type):
-    def __init__(self, name: str|any, index: int = 0, fields: dict[str, Type] = {}):
+    def __init__(self, name: Union[str, Any], index: int = 0, fields: dict[str, Type] = {}):
         super().__init__(name, index)
         self.fields = fields
 
@@ -44,7 +46,7 @@ class StructType(Type):
 
 
 class FunctionType(Type):
-    def __init__(self, name: str|any, param_types: List[Type], return_type: Type, index: int = 0):
+    def __init__(self, name: Union[str, Any], param_types: List[Type], return_type: Type, index: int = 0):
         super().__init__(name, index)
         self.param_types = param_types
         self.return_type = return_type

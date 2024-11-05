@@ -4,10 +4,15 @@
 # CFG: Context-Free Grammar构建基础
 from abc import ABC, abstractmethod
 from typing import Union
+from VM.scope import Scope
+from VM.symbol_t import FunctionSymbol, VariableSymbol
+from VM.type import Type
+from typing import Any
+
 
 class AST(ABC):
     @abstractmethod
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         pass
 
     @abstractmethod
@@ -19,7 +24,7 @@ class Declaration(AST):
     def __init__(self, name):
         self.name = name
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_declaration(self)
 
     def dump(self, indent=0):
@@ -27,7 +32,7 @@ class Declaration(AST):
 
 
 class Statement(AST):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         pass
 
     def dump(self, indent=0):
@@ -35,10 +40,11 @@ class Statement(AST):
 
 
 class BlockStatement(Statement):
-    def __init__(self, statements: list):
+    def __init__(self, statements: list, scope: Scope=None):
         self.statements = statements
+        self.scope = scope
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_block_statement(self)
 
     def dump(self, indent=0):
@@ -47,8 +53,29 @@ class BlockStatement(Statement):
             statement.dump(indent + 1)
 
 
+class ArrayStatement(Statement):
+    def __init__(self, statements: list):
+        self.statements = statements
+
+    def accept(self, visitor, additional=None):
+        return visitor.visit_array_statement(self)
+
+    def dump(self, indent=0):
+        print('  ' * indent + 'ArrayStatement')
+        for statement in self.statements:
+            statement.dump(indent + 1)
+
+
 class Expression(AST):
-    def accept(self, visitor):
+    def __init__(self, the_type: Type, is_left: bool, is_constant: bool, is_temp: bool, inferred_type: Type=None):
+        super().__init__()
+        self.the_type = the_type
+        self.is_left = is_left
+        self.is_constant = is_constant
+        self.is_temp = is_temp
+        self.inferred_type = inferred_type
+
+    def accept(self, visitor, additional=None):
         pass
 
     def dump(self, indent=0):
@@ -59,7 +86,7 @@ class ExpressionStatement(Statement):
     def __init__(self, expression: Expression):
         self.expression = expression
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_expression_statement(self)
 
     def dump(self, indent=0):
@@ -72,43 +99,69 @@ class ExpressionStatement(Statement):
 
 
 class FunctionDeclaration(Declaration):
-    def __init__(self, name: str, parameters: list, body: BlockStatement):
+    def __init__(self, name: str, parameters: list, body: BlockStatement, scope: Scope, symbol: FunctionSymbol, return_type: Type=None):
         self.name = name
         self.parameters = parameters
         self.body = body
+        self.scope = scope
+        self.symbol = symbol
+        self.return_type = return_type
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_function_declaration(self)
 
     def dump(self, indent=0):
         print('  ' * indent + 'FunctionDeclaration: ' + self.name)
+        print('  ' * (indent + 1) + 'ReturnType: ' + str(self.return_type))
         for parameter in self.parameters:
             print('  ' * (indent + 1) + 'Parameter: ' + parameter)
         self.body.dump(indent + 1)
 
 
+class Variable(Expression):
+    def __init__(self, name: str, declaration: Declaration = None, symbol: VariableSymbol = None, is_left: bool = None):
+        self.name = name
+        self.declaration = declaration
+        self.symbol = symbol
+        self.is_left = is_left
+
+    def accept(self, visitor, additional=None):
+        return visitor.visit_variable(self, additional)
+
+    def dump(self, indent=0):
+        print('  ' * indent + 'Variable: ' + self.name)
+        print('  ' * (indent + 1) + 'Symbol: ' + str(self.symbol))
+        self.declaration.dump(indent + 1) if self.declaration else print('  ' * (indent + 1) + 'Declaration: None')
+
+
 class VariableDeclaration(Declaration):
-    def __init__(self, name: str, initializer: AST):
+    def __init__(self, name: str, initializer: Variable=None, symbol: VariableSymbol=None, inferredType: Type=None):
         self.name = name
         self.initializer = initializer
+        self.symbol = symbol
+        self.inferredType = inferredType
 
-    def accept(self, visitor):
-        return visitor.visit_variable_declaration(self)
+    def accept(self, visitor, additional=None):
+        return visitor.visit_variable_declaration(self, additional)
 
     def dump(self, indent=0):
         print('  ' * indent + 'VariableDeclaration: ' + self.name)
         self.initializer.dump(indent + 1) if self.initializer else print('  ' * (indent + 1) + 'Initializer: None')
+        print('  ' * (indent + 1) + 'InferredType: ' + str(self.inferredType))
+        print('  ' * (indent + 1) + 'Symbol: ' + str(self.symbol))
 
 
 class Program(BlockStatement):
-    def __init__(self, statements):
-        self.statements = statements
+    def __init__(self, statements, scope: Scope, symbol: FunctionSymbol):
+        super().__init__(statements, scope)
+        self.symbol = symbol
 
-    def accept(self, visitor):
-        return visitor.visit_program(self)
+    def accept(self, visitor, additional=None):
+        return visitor.visit_program(self, additional)
 
     def dump(self, indent=0):
         print('  ' * indent + 'Program')
+        print('  ' * (indent + 1) + 'Symbol: ' + str(self.symbol))
         for statement in self.statements:
             if isinstance(statement, list):
                 for s in statement:
@@ -123,7 +176,7 @@ class IfStatement(Statement):
         self.consequent = consequent
         self.alternate = alternate
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_if_statement(self)
 
     def dump(self, indent=0):
@@ -140,7 +193,7 @@ class WhileStatement(Statement):
         self.test = test
         self.body = body
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_while_statement(self)
 
     def dump(self, indent=0):
@@ -150,13 +203,14 @@ class WhileStatement(Statement):
 
 
 class ForStatement(Statement):
-    def __init__(self, init: AST, test: Expression, update: AST, body: BlockStatement):
+    def __init__(self, init: AST, test: Expression, update: Expression, body: BlockStatement, scope: Scope):
         self.init = init
         self.test = test
         self.update = update
         self.body = body
+        self.scope = scope
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_for_statement(self)
 
     def dump(self, indent=0):
@@ -168,7 +222,7 @@ class ForStatement(Statement):
 
 
 class BreakStatement(Statement):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_break_statement(self)
 
     def dump(self, indent=0):
@@ -177,7 +231,7 @@ class BreakStatement(Statement):
 
 class ContinueStatement(Statement):
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_continue_statement(self)
 
     def dump(self, indent=0):
@@ -188,7 +242,7 @@ class ReturnStatement(Statement):
     def __init__(self, argument: Expression):
         self.argument = argument
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_return_statement(self)
 
     def dump(self, indent=0):
@@ -202,7 +256,7 @@ class BinaryExpression(Expression):
         self.operator = operator
         self.right = right
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_binary_expression(self)
 
     def dump(self, indent=0):
@@ -217,7 +271,7 @@ class CallExpression(Expression):
         self.callee = callee
         self.arguments = arguments
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_call_expression(self)
 
     def dump(self, indent=0):
@@ -226,23 +280,11 @@ class CallExpression(Expression):
             argument.dump(indent + 1)
 
 
-class Variable(Expression):
-    def __init__(self, name: str, declaration: Declaration):
-        self.name = name
-        self.declaration = declaration
-
-    def accept(self, visitor):
-        return visitor.visit_variable(self)
-
-    def dump(self, indent=0):
-        print('  ' * indent + 'Variable: ' + self.name)
-
-
 class String(Expression):
     def __init__(self, value: str):
         self.value = value
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_string_literal(self)
 
     def dump(self, indent=0):
@@ -253,7 +295,7 @@ class Integer(Expression):
     def __init__(self, value: int):
         self.value = value
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_integer_literal(self)
 
     def dump(self, indent=0):
@@ -264,7 +306,7 @@ class Decimal(Expression):
     def __init__(self, value: float):
         self.value = value
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_decimal_literal(self)
 
     def dump(self, indent=0):
@@ -275,7 +317,7 @@ class Boolean(Expression):
     def __init__(self, value: bool):
         self.value = value
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_boolean_literal(self)
 
     def dump(self, indent=0):
@@ -283,7 +325,7 @@ class Boolean(Expression):
 
 
 class Null(Expression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_null_literal(self)
 
     def dump(self, indent=0):
@@ -295,7 +337,7 @@ class Assignment(Expression):
         self.left = left
         self.right = right
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_assignment_expression(self)
 
     def dump(self, indent=0):
@@ -305,7 +347,7 @@ class Assignment(Expression):
 
 
 class LogicalOr(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_logical_or_expression(self)
 
     def dump(self, indent=0):
@@ -315,7 +357,7 @@ class LogicalOr(BinaryExpression):
 
 
 class LogicalAnd(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_logical_and_expression(self)
 
     def dump(self, indent=0):
@@ -325,7 +367,7 @@ class LogicalAnd(BinaryExpression):
 
 
 class BitwiseOr(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_bitwise_or_expression(self)
 
     def dump(self, indent=0):
@@ -335,7 +377,7 @@ class BitwiseOr(BinaryExpression):
 
 
 class BitwiseAnd(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_bitwise_and_expression(self)
 
     def dump(self, indent=0):
@@ -345,7 +387,7 @@ class BitwiseAnd(BinaryExpression):
 
 
 class BitwiseXor(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_bitwise_xor_expression(self)
 
     def dump(self, indent=0):
@@ -358,7 +400,7 @@ class BitwiseNot(Expression):
     def __init__(self, expression: Expression):
         self.expression = expression
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_bitwise_not_expression(self)
 
     def dump(self, indent=0):
@@ -367,7 +409,7 @@ class BitwiseNot(Expression):
 
 
 class Equal(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_equality_expression(self)
 
     def dump(self, indent=0):
@@ -377,7 +419,7 @@ class Equal(BinaryExpression):
 
 
 class NotEqual(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_equality_expression(self)
 
     def dump(self, indent=0):
@@ -387,7 +429,7 @@ class NotEqual(BinaryExpression):
 
 
 class Less(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_relational_expression(self)
 
     def dump(self, indent=0):
@@ -397,7 +439,7 @@ class Less(BinaryExpression):
 
 
 class Greater(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_relational_expression(self)
 
     def dump(self, indent=0):
@@ -407,7 +449,7 @@ class Greater(BinaryExpression):
 
 
 class LessEqual(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_relational_expression(self)
 
     def dump(self, indent=0):
@@ -417,7 +459,7 @@ class LessEqual(BinaryExpression):
 
 
 class GreaterEqual(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_relational_expression(self)
 
     def dump(self, indent=0):
@@ -427,7 +469,7 @@ class GreaterEqual(BinaryExpression):
 
 
 class Add(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_additive_expression(self)
 
     def dump(self, indent=0):
@@ -437,7 +479,7 @@ class Add(BinaryExpression):
 
 
 class Subtract(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_additive_expression(self)
 
     def dump(self, indent=0):
@@ -447,7 +489,7 @@ class Subtract(BinaryExpression):
 
 
 class Multiply(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_multiplicative_expression(self)
 
     def dump(self, indent=0):
@@ -457,7 +499,7 @@ class Multiply(BinaryExpression):
 
 
 class Divide(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_multiplicative_expression(self)
 
     def dump(self, indent=0):
@@ -467,7 +509,7 @@ class Divide(BinaryExpression):
 
 
 class Modulo(BinaryExpression):
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_multiplicative_expression(self)
 
     def dump(self, indent=0):
@@ -480,7 +522,7 @@ class Positive(Expression):
     def __init__(self, expression: Expression):
         self.expression = expression
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_unary_expression(self)
 
     def dump(self, indent=0):
@@ -492,7 +534,7 @@ class Negative(Expression):
     def __init__(self, expression: Expression):
         self.expression = expression
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_unary_expression(self)
 
     def dump(self, indent=0):
@@ -505,7 +547,7 @@ class Not(Expression):
     def __init__(self, expression: Expression):
         self.expression = expression
 
-    def accept(self, visitor):
+    def accept(self, visitor, additional=None):
         return visitor.visit_unary_expression(self)
 
     def dump(self, indent=0):
@@ -516,123 +558,128 @@ class Not(Expression):
 # 对AST做遍历的Vistor
 # 这是一个基类，定义了缺省的遍历方式。子类可以覆盖某些方法，修改遍历方式。
 class AstVisitor:
-    def visit(self, node: AST):
-        return node.accept(self)
+    def visit(self, node: AST, additional=None) -> Any:
+        return node.accept(self, additional) if node else None
 
-    def visit_declaration(self, node: Declaration):
-        pass
+    def visit_program(self, node: Program, additional=None) -> Any:
+        # Program是BlockStatement的子类，所以直接调用BlockStatement的visit方法
+        return self.visit_block_statement(node, additional)
 
-    def visit_statement(self, node: Statement):
-        pass
-
-    def visit_expression(self, node: Expression):
-        pass
-
-    def visit_block_statement(self, node: BlockStatement):
+    def visit_block_statement(self, node: BlockStatement, additional=None) -> Any:
+        ret = None
         for statement in node.statements:
-            self.visit(statement)
+            ret = self.visit(statement, additional)
+        return ret
 
-    def visit_expression_statement(self, node: ExpressionStatement):
-        self.visit(node.expression)
+    def visit_variable_declaration(self, node: VariableDeclaration, additional=None) -> Any:
+        return self.visit(node.initializer, additional)
 
-    def visit_function_declaration(self, node: FunctionDeclaration):
-        self.visit(node.body)
+    def visit_function_declaration(self, node: FunctionDeclaration, additional=None) -> Any:
+        for parameter in node.parameters:
+            self.visit(parameter, additional)
+        return self.visit(node.body, additional)
 
-    def visit_variable_declaration(self, node: VariableDeclaration):
-        self.visit(node.initializer)
+    def visit_expression_statement(self, node: ExpressionStatement, additional=None) -> Any:
+        return self.visit(node.expression, additional)
 
-    def visit_program(self, node: Program):
-        self.visit(node.statements)
+    def visit_return_statement(self, node: ReturnStatement, additional=None) -> Any:
+        return self.visit(node.argument, additional)
 
-    def visit_binary_expression(self, node: BinaryExpression):
-        self.visit(node.left)
-        self.visit(node.right)
+    def visit_if_statement(self, node: IfStatement, additional=None) -> Any:
+        self.visit(node.test, additional)
+        self.visit(node.consequent, additional)
+        self.visit(node.alternate, additional) if node.alternate else None
+        return None
 
-    def visit_call_expression(self, node: CallExpression):
+    def visit_while_statement(self, node: WhileStatement, additional=None) -> Any:
+        self.visit(node.test, additional)
+        return self.visit(node.body, additional)
+
+    def visit_for_statement(self, node: ForStatement, additional=None) -> Any:
+        self.visit(node.init, additional) if node.init else None
+        self.visit(node.test, additional) if node.test else None
+        self.visit(node.update, additional) if node.update else None
+        return self.visit(node.body, additional)
+
+    def visit_break_statement(self, node: BreakStatement, additional=None) -> Any:
+        return None
+
+    def visit_continue_statement(self, node: ContinueStatement, additional=None) -> Any:
+        return None
+
+    def visit_binary_expression(self, node: BinaryExpression, additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_integer_literal(self, node: Integer, additional=None) -> Any:
+        return node.value
+
+    def visit_decimal_literal(self, node: Decimal, additional=None) -> Any:
+        return node.value
+
+    def visit_string_literal(self, node: String, additional=None) -> Any:
+        return node.value
+
+    def visit_boolean_literal(self, node: Boolean, additional=None) -> Any:
+        return node.value
+
+    def visit_null_literal(self, node: Null, additional=None) -> Any:
+        return None
+
+    def visit_variable(self, node: Variable, additional=None) -> Any:
+        print("variable name -> ", node.name)
+        print("variable declaration -> ", node.declaration)
+        print("variable symbol -> ", node.symbol)
+        print("variable is_left -> ", node.is_left)
+        return None
+
+    def visit_logical_or_expression(self, node: LogicalOr, additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_logical_and_expression(self, node: LogicalAnd, additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_bitwise_or_expression(self, node: BitwiseOr, additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_bitwise_and_expression(self, node: BitwiseAnd, additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_bitwise_xor_expression(self, node: BitwiseXor, additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_bitwise_not_expression(self, node: BitwiseNot, additional=None) -> Any:
+        return self.visit(node.expression, additional)
+
+    def visit_equality_expression(self, node: Union[Equal, NotEqual], additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_relational_expression(self, node: Union[Less, Greater, LessEqual, GreaterEqual], additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_additive_expression(self, node: Union[Add, Subtract], additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_multiplicative_expression(self, node: Union[Multiply, Divide, Modulo], additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_unary_expression(self, node: Union[Positive, Negative, Not], additional=None) -> Any:
+        return self.visit(node.expression, additional)
+
+    def visit_assignment_expression(self, node: Assignment, additional=None) -> Any:
+        self.visit(node.left, additional)
+        return self.visit(node.right, additional)
+
+    def visit_call_expression(self, node: CallExpression, additional=None) -> Any:
         for argument in node.arguments:
-            self.visit(argument)
-
-    def visit_variable(self, node: Variable):
-        pass
-
-    def visit_string_literal(self, node: String):
-        pass
-
-    def visit_integer_literal(self, node: Integer):
-        pass
-
-    def visit_decimal_literal(self, node: Decimal):
-        pass
-
-    def visit_boolean_literal(self, node: Boolean):
-        pass
-
-    def visit_null_literal(self, node: Null):
-        pass
-
-    def visit_if_statement(self, node: IfStatement):
-        self.visit(node.test)
-        self.visit(node.consequent)
-        self.visit(node.alternate)
-
-    def visit_while_statement(self, node: WhileStatement):
-        self.visit(node.test)
-        self.visit(node.body)
-
-    def visit_for_statement(self, node: ForStatement):
-        self.visit(node.init)
-        self.visit(node.test)
-        self.visit(node.update)
-        self.visit(node.body)
-
-    def visit_break_statement(self, node: BreakStatement):
-        pass
-
-    def visit_continue_statement(self, node: ContinueStatement):
-        pass
-
-    def visit_return_statement(self, node: ReturnStatement):
-        self.visit(node.argument)
-
-    def visit_assignment_expression(self, node: Assignment):
-        self.visit(node.left)
-        self.visit(node.right)
-
-    def visit_logical_or_expression(self, node: LogicalOr):
-        self.visit(node.left)
-        self.visit(node.right)
-
-    def visit_logical_and_expression(self, node: LogicalAnd):
-        self.visit(node.left)
-        self.visit(node.right)
-
-    def visit_equality_expression(self, node: Equal):
-        self.visit(node.left)
-        self.visit(node.right)
-
-    def visit_relational_expression(self, node: Less):
-        self.visit(node.left)
-        self.visit(node.right)
-
-    def visit_additive_expression(self, node: Add):
-
-        self.visit(node.left)
-        self.visit(node.right)
-
-    def visit_multiplicative_expression(self, node: Multiply):
-        self.visit(node.left)
-        self.visit(node.right)
-
-    def visit_unary_expression(self, node: Union[Positive, Negative, Not]):
-        self.visit(node.expression)
-
-    def visit_positive_expression(self, node: Positive):
-        self.visit(node.expression)
-
-    def visit_negative_expression(self, node: Negative):
-
-        self.visit(node.expression)
-
-    def visit_not_expression(self, node: Not):
-        self.visit(node.expression)
-
+            self.visit(argument, additional)
+        return self.visit(node.callee, additional)
