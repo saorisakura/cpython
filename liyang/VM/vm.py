@@ -269,3 +269,190 @@ class Interpretor(AstVisitor):
             return self.visit(node.argument)
         else:
             return -self.visit(node.argument)
+
+
+
+class OpCode:
+    def __init__(self, op: str, arg: any = None):
+        self.op = op
+        self.arg = arg
+
+    def __str__(self):
+        return f"{self.op} {self.arg}" if self.arg else self.op
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class ByteCodeGenerator(AstVisitor):
+    def __init__(self):
+        self.current_frame = Frame()
+        self.stacks: List[Frame] = [self.current_frame]
+        self.code: List[OpCode] = []
+
+    def dump(self):
+        for op in self.code:
+            print(op)
+
+    def push_frame(self, frame: Frame):
+        self.stacks.append(frame)
+        self.current_frame = frame
+
+    def pop_frame(self):
+        self.stacks.pop()
+        if len(self.stacks) > 0:
+            self.current_frame = self.stacks[-1]
+        else:
+            self.current_frame = None
+
+    def visit_program(self, node: Program, additional=None):
+        for statement in node.statements:
+            self.visit(statement)
+
+    def visit_function_declaration(self, node: FunctionDeclaration, additional=None):
+        self.push_frame(Frame(self.current_frame.scope))
+        for param in node.parameters:
+            self.current_frame.scope.put(param.name, param.symbol)
+        self.visit(node.body)
+        self.pop_frame()
+
+    def visit_block_statement(self, node: BlockStatement, additional=None):
+        for statement in node.statements:
+            self.visit(statement)
+
+    def visit_return_statement(self, node: ReturnStatement, additional=None):
+        if node.argument:
+            self.code.append(OpCode("PUSH", self.visit(node.argument)))
+        self.code.append(OpCode("RET"))
+
+    def visit_if_statement(self, node: IfStatement, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.test)))
+        self.code.append(OpCode("JMPF", len(self.code) + 2))
+        self.visit(node.consequent)
+        if node.alternate:
+            self.code.append(OpCode("JMP", len(self.code) + 2))
+            self.visit(node.alternate)
+
+    def visit_for_statement(self, node: ForStatement, additional=None):
+        if node.init:
+            self.visit(node.init)
+        self.code.append(OpCode("PUSH", self.visit(node.test)))
+        self.code.append(OpCode("JMPF", len(self.code) + 2))
+        self.visit(node.body)
+        if node.update:
+            self.visit(node.update)
+        self.code.append(OpCode("JMP", len(self.code) - 3))
+
+    def visit_call_expression(self, node: CallExpression, additional=None):
+        for arg in node.arguments:
+            self.code.append(OpCode("PUSH", self.visit(arg)))
+        self.code.append(OpCode("CALL", node.callee.name))
+
+    def visit_variable_declaration(self, node: VariableDeclaration, additional=None):
+        if node.initializer:
+            self.code.append(OpCode("PUSH", self.visit(node.initializer)))
+            self.code.append(OpCode("STORE", node.symbol.name))
+
+    def visit_variable(self, node: Variable, additional=None):
+        return node.symbol.name
+
+    def visit_assignment_expression(self, node: Assignment, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        self.code.append(OpCode("STORE", node.left.symbol.name))
+
+    def visit_additive_expression(self, node: Union[Add, Subtract], additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        if isinstance(node, Add):
+            self.code.append(OpCode("ADD"))
+        else:
+            self.code.append(OpCode("SUB"))
+
+    def visit_multiplicative_expression(self, node: Union[Multiply, Divide, Modulo], additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        if isinstance(node, Multiply):
+            self.code.append(OpCode("MUL"))
+        elif isinstance(node, Divide):
+            self.code.append(OpCode("DIV"))
+        else:
+            self.code.append(OpCode("MOD"))
+
+    def visit_relational_expression(self, node: Union[Less, LessEqual, Greater, GreaterEqual], additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        if isinstance(node, Less):
+            self.code.append(OpCode("LT"))
+        elif isinstance(node, LessEqual):
+            self.code.append(OpCode("LE"))
+        elif isinstance(node, Greater):
+            self.code.append(OpCode("GT"))
+        else:
+            self.code.append(OpCode("GE"))
+
+    def visit_equality_expression(self, node: Union[Equal, NotEqual], additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        if isinstance(node, Equal):
+            self.code.append(OpCode("EQ"))
+        else:
+            self.code.append(OpCode("NE"))
+
+    def visit_logical_and_expression(self, node: LogicalAnd, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        self.code.append(OpCode("AND"))
+
+    def visit_logical_or_expression(self, node: LogicalOr, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        self.code.append(OpCode("OR"))
+
+    def visit_logical_not_expression(self, node: Not, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.argument)))
+        self.code.append(OpCode("NOT"))
+
+    def visit_integer_literal(self, node: Integer, additional=None):
+        return node.value
+
+    def visit_decimal_literal(self, node: Decimal, additional=None):
+        return node.value
+
+    def visit_string_literal(self, node: String, additional=None):
+        return node.value
+
+    def visit_boolean_literal(self, node: Boolean, additional=None):
+        return node.value
+
+    def visit_bitwise_and_expression(self, node: BitwiseAnd, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        self.code.append(OpCode("BAND"))
+
+    def visit_bitwise_or_expression(self, node: BitwiseOr, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        self.code.append(OpCode("BOR"))
+
+    def visit_bitwise_xor_expression(self, node: BitwiseXor, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.left)))
+        self.code.append(OpCode("PUSH", self.visit(node.right)))
+        self.code.append(OpCode("BXOR"))
+
+    def visit_bitwise_not_expression(self, node: BitwiseNot, additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.argument)))
+        self.code.append(OpCode("BNOT"))
+
+    def visit_unary_expression(self, node: Union[Positive, Negative], additional=None):
+        self.code.append(OpCode("PUSH", self.visit(node.argument)))
+        if isinstance(node, Positive):
+            self.code.append(OpCode("POS"))
+        else:
+            self.code.append(OpCode("NEG"))
+
+    def generate(self, node: AST):
+        self.visit(node)
+        return self.code
+
+    def __str__(self):
+        return "\n".join([str(op) for op in self.code])

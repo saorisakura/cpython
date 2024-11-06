@@ -3,7 +3,7 @@
 from VM.scanner import CharStream, Lexer
 from VM.parser import Parser
 from VM.semantics import Entry, RefResolver
-from VM.vm import Interpretor
+from VM.vm import Interpretor, ByteCodeGenerator
 
 
 def main():
@@ -139,6 +139,10 @@ print(fibonacci(10));
         # call expression callee没有resolve
         interpretor.visit(program)
         print('-' * 80)
+        # 生成字节码
+        generator = ByteCodeGenerator()
+        generator.visit(program)
+        generator.dump()
 
 
 if __name__ == '__main__':
