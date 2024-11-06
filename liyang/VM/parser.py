@@ -36,8 +36,7 @@ class Parser:
 
     def parse(self):
         scope = Scope()
-        symbol = Symbol('program', FunctionType('program', ['any'], None))
-        return Program(self.parse_statements(), scope, symbol)
+        return Program(self.parse_statements(), scope)
 
     def parse_statements(self):
         statements = []
@@ -114,8 +113,14 @@ class Parser:
         while token.kind != Separator or token.value != ')':
             if token.kind == Separator and token.value == ',':
                 self.lexer.next()
-                token = self.lexer.peek()
-            params.append(self.lexer.next().value)
+            param_name = self.lexer.next()
+            token = self.lexer.peek()
+            if token.kind != Operator or token.value != ':':
+                raise Exception('Expect :')
+            self.lexer.next()
+            t = self.parse_type(self.lexer.next().value)
+            v = Variable(param_name.value, symbol=VariableSymbol(param_name.value, t), is_left=False)
+            params.append(v)
             token = self.lexer.peek()
         # skip ')'
         if self.lexer.peek().value == ')':
@@ -123,12 +128,18 @@ class Parser:
         else:
             raise Exception('Expect )')
         token = self.lexer.peek()
+        if token.kind == KeyWord or token.kind == Identifier:
+            token = self.lexer.next()
+            return_type = self.parse_type(token.value)
+        else:
+            return_type = None
+
+        token = self.lexer.peek()
         if token.kind != Separator or token.value != '{':
             raise Exception('Expect {')
         body = self.parse_block()
         scope = Scope()
-        symbol = Symbol(name, FunctionType(name, params, body))
-        return FunctionDeclaration(name, params, body, scope, symbol)
+        return FunctionDeclaration(name, params, body, scope, None, return_type)
 
     def parse_if(self):
         # skip 'if'

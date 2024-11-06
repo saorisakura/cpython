@@ -94,10 +94,17 @@ function bnot(a) {
 
 
 def main1():
-    source = '''
+    source1 = '''
 let a: int = 1;
 a = a + 1;
-print(a);
+// should print 2
+print(a);'''
+    source = '''
+function add(a: int, b: int) int {
+    return a + b;
+}
+// should print 2
+print(add(1, 1));
 '''
     lexer = Lexer(CharStream(source))
     parser = Parser(lexer)
@@ -107,6 +114,8 @@ print(a);
     # 建立符号表，记录每个符号的类型和作用域
     entry = Entry()
     entry.visit(program)
+    program.dump()
+    print('*' * 80)
     # 消解符号和定义间的引用
     # 函数、变量、类型等
     resolver = RefResolver()
@@ -115,9 +124,10 @@ print(a);
     print('+' * 80)
     interpretor = Interpretor()
     # 2024-02-29顺利打印出11
-    # 没有区分类型，按理应该是1 + 1 = 2
+    # 没有区分类型，按理应该是1 + 1 = 2 已修改
     # call expression callee没有resolve
     interpretor.visit(program)
+    print('-' * 80)
 
 
 if __name__ == '__main__':

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # 语义分析
-from VM.asts import AstVisitor, AST, BlockStatement, ForStatement, FunctionDeclaration, Program, Variable, VariableDeclaration, Assignment
+from VM.asts import AstVisitor, AST, BlockStatement, CallExpression, ForStatement, FunctionDeclaration, Program, Variable, VariableDeclaration, Assignment
 from VM.scope import Scope
-from VM.symbol_t import FunctionSymbol, VariableSymbol
+from VM.symbol_t import FunctionSymbol, VariableSymbol, built_ins
 from VM.type import FunctionType, SystemType
 from typing import Mapping, Any, Optional
 
@@ -43,8 +43,8 @@ class Entry(SemanticAstVisitor):
         function_name = node.name
 
         params_type = []
-        for param in node.params:
-            params_type.append(param.type)
+        for param in node.parameters:
+            params_type.append(param.symbol.type)
 
         function_type = FunctionType(function_name, params_type, node.return_type)
         symbol = FunctionSymbol(function_name, function_type)
@@ -63,12 +63,14 @@ class Entry(SemanticAstVisitor):
         self.scope = Scope(self.scope)
         node.scope = self.scope
 
-        super().visit_function_declaration(node)
+        super().visit_function_declaration(node, additional='function')
 
         self.symbol = old_symbol
         self.scope = old_scope
 
     def visit_block_statement(self, node: BlockStatement, additional=None):
+        # 创建新的作用域
+        # 外侧作用域有可能是函数作用域
         old_scope = self.scope
         self.scope = Scope(self.scope)
         node.scope = self.scope
@@ -116,10 +118,15 @@ class Entry(SemanticAstVisitor):
 
     def visit_variable(self, node: Variable, additional=None):
         current_scope = self.scope
+        # 如果是函数声明，不需要检查变量是否定义
+        if isinstance(additional, str) and additional == 'function':
+            current_scope.put(node.name, node.symbol)
+            return
         variable_name = node.name
-        symbol = current_scope.lookup(variable_name)
-        if symbol is None:
+        finded = current_scope.lookup(variable_name)
+        if finded is False:
             raise Exception(f"Variable '{variable_name}' is not defined.")
+        symbol = current_scope.get(variable_name)
         node.symbol = symbol
 
 
@@ -138,7 +145,7 @@ class RefResolver(SemanticAstVisitor):
 
         self.declared_vars[self.scope] = {}
 
-        super().visit_function_declaration(node)
+        super().visit_function_declaration(node, additional='function')
 
         self.scope = old_scope
 
@@ -195,8 +202,15 @@ class RefResolver(SemanticAstVisitor):
 
     def visit_variable(self, node: Variable, additional=None):
         current_scope = self.scope
-        node.symbol = self.find_variable(node, current_scope)
-        node.declaration = node.symbol.decl
+        if isinstance(additional, str) and additional == 'function':
+            current_scope.put(node.name, node.symbol)
+            return
+        sym = self.find_variable(node, current_scope)
+        if sym is not None:
+            node.symbol = sym
+            node.declaration = node.symbol.decl
+        else:
+            raise Exception(f"Variable '{node.name}' is not defined.")
 
     def find_variable(self, node: Variable, scope: Scope) -> Optional[VariableSymbol]:
         declared_vars: Mapping[str, VariableSymbol] = self.declared_vars[scope]
@@ -206,7 +220,7 @@ class RefResolver(SemanticAstVisitor):
                 return declared_vars[node.name]
             else:
                 if isinstance(symbol_in_scope, VariableSymbol):
-                    self.add_error(node, f"Variable '{node.name}' is not defined.")
+                    return symbol_in_scope
                 else:
                     self.add_error(node, f"Variable '{node.name}' is not a variable.")
         else:
@@ -215,6 +229,37 @@ class RefResolver(SemanticAstVisitor):
             else:
                 self.add_error(node, f"Variable '{node.name}' is not defined.")
         return None
+
+    def visit_call_expression(self, node: CallExpression, additional=None):
+        current_scope = self.scope
+        if node.name == "print":
+            for arg in node.arguments:
+                self.visit(arg)
+            node.callee = built_ins.find(node.name)
+            return None
+        elif node.name == "input":
+            return None
+        elif node.name == "int":
+            return None
+        elif node.name == "float":
+            return None
+        elif node.name == "str":
+            return None
+        elif node.name == "bool":
+            return None
+        elif node.name == "void":
+            return None
+        elif node.name == "len":
+            return None
+        else:
+            existed = current_scope.lookup(node.name)
+            if existed is False:
+                self.add_error(node, f"Function '{node.name}' is not defined.")
+            else:
+                symbol = current_scope.get(node.name)
+                node.symbol = symbol
+                node.callee = symbol.decl
+
 
 class SemanticAnalyzer:
     def __init__(self):

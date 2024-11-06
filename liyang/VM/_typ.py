@@ -14,6 +14,9 @@ class Type(ABC):
     def less_eq(self, other):
         pass
 
+    def __str__(self):
+        return self.name
+
 
 class ObjectType(Type):
     def __init__(self, name: Union[str, Any], index: int = 0, upper_bound: List[Type] = [], lower_bound: List[Type] = []):

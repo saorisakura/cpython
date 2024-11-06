@@ -83,9 +83,13 @@ class Interpretor(AstVisitor):
 
     def visit_call_expression(self, node: CallExpression, additional=None):
         # 内置函数
-        if node.name == "print":
+        # TODO: callee没有resolve
+        if node.callee.name == "print":
             for arg in node.arguments:
-                print(self.visit(arg))
+                ret = self.visit(arg)
+                if isinstance(ret, ReturnValue):
+                    ret = ret.value
+                print(ret, end="")
             return None
         elif node.callee.name == "input":
             return input()
@@ -103,9 +107,9 @@ class Interpretor(AstVisitor):
             return len(self.visit(node.arguments[0]))
         else:
             # 用户自定义函数
-            for param, arg in zip(node.callee.params, node.arguments):
-                self.current_frame.values[param.name] = self.visit(arg)
             self.push_frame(Frame(self.current_frame.scope))
+            for param, arg in zip(node.callee.parameters, node.arguments):
+                self.current_frame.values[param.name] = self.visit(arg)
             ret = self.visit(node.callee.body)
             self.pop_frame()
             return ret
@@ -180,16 +184,16 @@ class Interpretor(AstVisitor):
         return not self.visit(node.argument)
 
     def visit_integer_literal(self, node: Integer, additional=None):
-        return node.value
+        return int(node.value)
 
     def visit_decimal_literal(self, node: Decimal, additional=None):
-        return node.value
+        return float(node.value)
 
     def visit_string_literal(self, node: String, additional=None):
         return node.value
 
     def visit_boolean_literal(self, node: Boolean, additional=None):
-        return node.value
+        return bool(node.value)
 
     def visit_bitwise_and_expression(self, node: BitwiseAnd, additional=None):
         left = self.visit(node.left)

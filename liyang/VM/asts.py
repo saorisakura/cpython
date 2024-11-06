@@ -113,8 +113,13 @@ class FunctionDeclaration(Declaration):
     def dump(self, indent=0):
         print('  ' * indent + 'FunctionDeclaration: ' + self.name)
         print('  ' * (indent + 1) + 'ReturnType: ' + str(self.return_type))
+        print('  ' * (indent + 1) + 'Symbol: ' + str(self.symbol))
+        s = self.scope
+        while s:
+            print('  ' * (indent + 1) + 'Scope: ' + str(s))
+            s = s.parent
         for parameter in self.parameters:
-            print('  ' * (indent + 1) + 'Parameter: ' + parameter)
+            parameter.dump(indent + 1)
         self.body.dump(indent + 1)
 
 
@@ -152,7 +157,7 @@ class VariableDeclaration(Declaration):
 
 
 class Program(BlockStatement):
-    def __init__(self, statements, scope: Scope, symbol: FunctionSymbol):
+    def __init__(self, statements, scope: Scope, symbol: FunctionSymbol = None):
         super().__init__(statements, scope)
         self.symbol = symbol
 
@@ -276,6 +281,10 @@ class CallExpression(Expression):
 
     def dump(self, indent=0):
         print('  ' * indent + 'CallExpression: ' + self.name)
+        if isinstance(self.callee, FunctionSymbol):
+            print('  ' * (indent + 1) + 'Callee: ' + self.callee.name)
+        else:
+            self.callee.dump(indent + 1) if self.callee else print('  ' * (indent + 1) + 'Callee: None')
         for argument in self.arguments:
             argument.dump(indent + 1)
 
@@ -559,7 +568,7 @@ class Not(Expression):
 # 这是一个基类，定义了缺省的遍历方式。子类可以覆盖某些方法，修改遍历方式。
 class AstVisitor:
     def visit(self, node: AST, additional=None) -> Any:
-        return node.accept(self, additional) if node else None
+        return node.accept(self, additional) if node and isinstance(node, AST) else None
 
     def visit_program(self, node: Program, additional=None) -> Any:
         # Program是BlockStatement的子类，所以直接调用BlockStatement的visit方法

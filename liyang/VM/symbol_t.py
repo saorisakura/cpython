@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from typing import List
+from VM.type import Type
 
 
 class Symbol:
@@ -24,7 +25,7 @@ class SymbolTable:
     def add(self, symbol: Symbol):
         self.symbols.append(symbol)
 
-    def find(self, name: str):
+    def find(self, name: str, t: Type = None):
         for symbol in self.symbols:
             if symbol.name == name:
                 return symbol
