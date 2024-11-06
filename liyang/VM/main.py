@@ -99,12 +99,21 @@ let a: int = 1;
 a = a + 1;
 // should print 2
 print(a);'''
-    source = '''
+    source2 = '''
 function add(a: int, b: int) int {
     return a + b;
 }
 // should print 2
 print(add(1, 1));
+'''
+    source = '''
+function fibonacci(n: int) int {
+    if (n <= 1) {
+        return n;
+    }
+    return fibonacci(n-1) + fibonacci(n-2);
+}
+print(fibonacci(10));
 '''
     lexer = Lexer(CharStream(source))
     parser = Parser(lexer)

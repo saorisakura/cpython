@@ -125,7 +125,13 @@ class Interpretor(AstVisitor):
         if node.is_left:
             return node.symbol
         else:
-            return self.current_frame.values[node.symbol.name]
+            return self.lookup_variable(node.symbol.name)
+
+    def lookup_variable(self, name: str):
+        for frame in reversed(self.stacks):
+            if name in frame.values:
+                return frame.values[name]
+        return None
 
     def visit_assignment_expression(self, node: Assignment, additional=None):
         val = self.visit(node.right)
@@ -135,6 +141,11 @@ class Interpretor(AstVisitor):
     def visit_additive_expression(self, node: Union[Add, Subtract], additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         if isinstance(node, Add):
             return left + right
         else:
@@ -143,6 +154,11 @@ class Interpretor(AstVisitor):
     def visit_multiplicative_expression(self, node: Union[Multiply, Divide, Modulo], additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         if isinstance(node, Multiply):
             return left * right
         elif isinstance(node, Divide):
@@ -153,6 +169,11 @@ class Interpretor(AstVisitor):
     def visit_relational_expression(self, node: Union[Less, LessEqual, Greater, GreaterEqual], additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         if isinstance(node, Less):
             return left < right
         elif isinstance(node, LessEqual):
@@ -165,6 +186,11 @@ class Interpretor(AstVisitor):
     def visit_equality_expression(self, node: Union[Equal, NotEqual], additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         if isinstance(node, Equal):
             return left == right
         else:
@@ -173,11 +199,21 @@ class Interpretor(AstVisitor):
     def visit_logical_and_expression(self, node: LogicalAnd, additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         return left and right
 
     def visit_logical_or_expression(self, node: LogicalOr, additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         return left or right
 
     def visit_logical_not_expression(self, node: Not, additional=None):
@@ -198,16 +234,31 @@ class Interpretor(AstVisitor):
     def visit_bitwise_and_expression(self, node: BitwiseAnd, additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         return left & right
 
     def visit_bitwise_or_expression(self, node: BitwiseOr, additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         return left | right
 
     def visit_bitwise_xor_expression(self, node: BitwiseXor, additional=None):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left, ReturnValue):
+            left = left.value
+        if isinstance(right, ReturnValue):
+            right = right.value
+
         return left ^ right
 
     def visit_bitwise_not_expression(self, node: BitwiseNot, additional=None):

@@ -282,9 +282,9 @@ class CallExpression(Expression):
     def dump(self, indent=0):
         print('  ' * indent + 'CallExpression: ' + self.name)
         if isinstance(self.callee, FunctionSymbol):
-            print('  ' * (indent + 1) + 'Callee: ' + self.callee.name)
+            print('  ' * (indent + 1) + 'Callee Symbol: ' + self.callee.name)
         else:
-            self.callee.dump(indent + 1) if self.callee else print('  ' * (indent + 1) + 'Callee: None')
+            print('  ' * (indent + 1) + 'Callee: ' + self.callee.name) if self.callee else print('  ' * (indent + 1) + 'Callee: None')
         for argument in self.arguments:
             argument.dump(indent + 1)
 
