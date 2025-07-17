@@ -1,5 +1,10 @@
 {
     "image": "ghcr.io/python/devcontainer:2025.05.29.15334414373",
+    "runArgs": [
+        "--dns=8.8.8.8",
+	"--dns=8.8.4.4",
+	"--dns=114.114.114.114"
+    ],
     "onCreateCommand": [
         // Install common tooling.
         "dnf",
