@@ -56,6 +56,67 @@ typedef struct PyPreConfig {
 
        Set to 1 by the -I command line option. If set to -1 (default), inherit
        Py_IsolatedFlag value. */
+    /*
+        ### Python Isolated 模式概述
+
+        Python 的 `-I` 或 `--isolated` 命令行选项用于以隔离模式启动 Python 解释器。这种模式下，解释器会忽略用户级别的配置，如环境变量和用户 site-packages，使运行环境更加干净、可重现。
+
+        ### 主要特点和使用场景
+
+        1. **环境隔离**：忽略 `PYTHONPATH`、`PYTHONHOME` 等环境变量，避免外部配置干扰。
+        2. **测试环境**：确保测试在标准环境中运行，提高结果可靠性。
+        3. **打包工具**：在构建和分发 Python 包时，确保不依赖本地环境。
+        4. **脚本沙盒**：运行不受信任的脚本时减少潜在风险。
+        5. **可重现性**：保证代码在不同环境中行为一致。
+
+        ### 使用示例
+
+        下面是一个展示 isolated 模式效果的示例：
+
+
+            
+            
+
+
+        ### 运行对比
+
+        1. **标准模式**：
+        ```bash
+        python check_env.py
+        ```
+        输出会包含 `PYTHONPATH` 环境变量和用户 site-packages 目录。
+
+        2. **隔离模式**：
+        ```bash
+        python -I check_env.py
+        ```
+        输出会显示：
+        - `sys.path` 不包含 `PYTHONPATH` 的内容
+        - `PYTHONPATH` 被忽略（显示未设置）
+        - 用户 site-packages 目录被排除
+
+        ### 实际应用场景
+
+        #### 1. 测试脚本
+        ```bash
+        python -I -m unittest mypackage.tests
+        ```
+        确保测试不依赖本地环境中的包。
+
+        #### 2. 运行不受信任的代码
+        ```bash
+        python -I untrusted_script.py
+        ```
+        减少脚本访问本地系统资源的风险。
+
+        #### 3. 构建打包工具
+        ```bash
+        python -I -m build --sdist --wheel .
+        ```
+        确保打包过程不依赖开发环境中的特定包。
+
+        通过这些示例可以看到，isolated 模式提供了一个干净的 Python 运行环境，非常适合需要环境隔离和可重现性的场景。
+    */
     int isolated;
 
     /* If greater than 0: use environment variables.

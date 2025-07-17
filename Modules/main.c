@@ -691,9 +691,12 @@ pymain_run_python(int *exitcode)
         *exitcode = pymain_run_file(config);
     }
     else {
+        // echo 'print("Hello, stdin!")' | python
+        // cat script.py | python
         *exitcode = pymain_run_stdin(config);
     }
 
+    // python  # 启动 REPL
     pymain_repl(config, exitcode);
     goto done;
 
